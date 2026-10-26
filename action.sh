@@ -36,6 +36,21 @@ STAGE=/data/adb/modules_update/agent_mobile_use
   echo "版本: $(grep '^version=' "$MODDIR/module.prop" 2>/dev/null | cut -d= -f2)"
 
   echo
+  # 确保 token 存在（与 service.sh 同逻辑），首次生成后按需导出一次到 Download。
+  if [ ! -s /data/local/tmp/.dsh_auth ] || [ ! -s /data/local/tmp/.dsh_token ]; then
+    TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+    printf '%s' "$TOKEN" > /data/local/tmp/.dsh_token
+    printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1 > /data/local/tmp/.dsh_auth
+    chmod 600 /data/local/tmp/.dsh_token /data/local/tmp/.dsh_auth
+    rm -f /data/local/tmp/.dsh_secret
+    echo "已生成新的局域网 token"
+  fi
+  # 只在从未导出过时导出一份明文，供 PC 端一次性取用；取完我会删除并放 flag 禁止再导出。
+  if [ ! -f /sdcard/Download/amu_token_read.flag ] && [ ! -f /sdcard/Download/amu_token.txt ]; then
+    cp /data/local/tmp/.dsh_token /sdcard/Download/amu_token.txt
+    echo "token 已导出到 /sdcard/Download/amu_token.txt（取用后请删除）"
+  fi
+
   echo "-- 3. 停旧进程 --"
   # 先让服务自己优雅注销副屏，避免留下孤儿 daemon 占着 3071（否则新 daemon 会
   # bind failed: EADDRINUSE 并直接退出，状态变 failed）。

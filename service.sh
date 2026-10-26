@@ -23,7 +23,18 @@ cp -f "$MODDIR/bin/agent_tools.dex" /data/local/tmp/agent_tools.dex 2>/dev/null
 cp -f "$MODDIR/bin/run_daemon.sh" /data/local/tmp/run_daemon.sh 2>/dev/null
 chmod 755 /data/local/tmp/run_daemon.sh 2>/dev/null
 
-# 局域网密码：服务端只保存 sha256（/data/local/tmp/.dsh_auth, 600），明文不落盘。
+# 局域网 token：网关是唯一权威。首次启动生成 32 字节随机值，写两份：
+#   sha256 -> /data/local/tmp/.dsh_auth  (600)  服务端比对用
+#   明文   -> /data/local/tmp/.dsh_token (600)  手机本地客户端读取用
+# 不依赖任何外部文件（DSH credentials / 网页控制台 / 手工设密码），换 DSH 凭证也不受影响。
+if [ ! -s /data/local/tmp/.dsh_auth ] || [ ! -s /data/local/tmp/.dsh_token ]; then
+    TOKEN=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+    printf '%s' "$TOKEN" > /data/local/tmp/.dsh_token
+    printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1 > /data/local/tmp/.dsh_auth
+    chmod 600 /data/local/tmp/.dsh_token /data/local/tmp/.dsh_auth
+    rm -f /data/local/tmp/.dsh_secret
+fi
+
 # 密码通过手机上的控制台页面（127.0.0.1:3070 的锁形按钮）设置，或 POST /api/auth/secret。
 # 未设置时非回环访问一律 401（fail closed），手机上的一切照常可用。
 

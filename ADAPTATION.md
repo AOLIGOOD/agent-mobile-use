@@ -207,3 +207,12 @@ Display <token> (virtual, "AgentVirtualDisplay")
 
 **行为变化**：副屏抓帧失败时返回 `500 Capture error: <原因>`
 （如 `mirror display unavailable`），**不再返回陈旧画面**。
+
+### clean2：清理引入的竞态
+
+删掉启动自检后，`setupMirrorDisplay` 变成紧跟建屏立刻跑 `dumpsys`，而 SurfaceFlinger
+还没把新显示注册进去，`layerStack candidates` 变成空列表、影子显示起不来。原来那个自检
+**顺带提供了 1~2 秒延迟**，属于无意中被依赖的副作用。
+
+改为显式有界重试：每 250ms 查一次、最多 3 秒；仍拿不到则记录
+`mirror: display never appeared in SurfaceFlinger dump` 并让截图明确报错。
